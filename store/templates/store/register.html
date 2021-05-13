@@ -1,0 +1,15 @@
+{% extends 'store/main.html' %}
+{% load static %}
+{% block content %}
+    <h3>Register</h3>
+    <center style="margin-top: 30px">
+      <form  action="." method="POST">
+        {% csrf_token %}
+          <table>
+              {{ form.as_table }}
+          </table>
+        <br/>
+        <input class="btn btn-primary" type="submit" value="Dang ki">
+      </form>
+    </center>
+{% endblock content %}
