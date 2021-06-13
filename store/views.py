@@ -66,7 +66,7 @@ def cart(request):
 						'id':product.id,
 						'name':product.name, 
 						'price':product.price, 
-					        # 'imageURL':product.imageURL
+					    'imageURL':product.imageURL
 						}, 
 					'quantity':cart[i]['quantity'],
 					'digital':product.digital,
