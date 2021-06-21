@@ -3,7 +3,11 @@ from .models import *
 import json
 from django.http import JsonResponse
 from . forms import RegistrationForm
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login
+import datetime
 
+@login_required
 def store(request):
 	# renderTotalItem
 	if request.user.is_authenticated:
@@ -11,86 +15,32 @@ def store(request):
 		order, created = Order.objects.get_or_create(customer=customer, complete=False)
 		# items = order.orderitem_set.all()
 		cartItems = order.get_cart_items
-	else:
-		try:
-			cart = json.loads(request.COOKIES['cart'])
-		except:
-			cart = {}
-		# print('CART:', cart)
-		#Create empty cart for now for non-logged in user
-		# items = []
-		order = {'get_cart_total':0, 'get_cart_items':0}
-		cartItems = order['get_cart_items']
-
-		for i in cart:
-			try:
-				# print("testt"+i)
-				cartItems += cart[i]['quantity']
-			except:
-				pass
 
 	products = Product.objects.all()
 	context = {'products':products, 'cartItems':cartItems}
 	return render(request, 'store/store.html', context)
 
+@login_required
 def cart(request):
 	if request.user.is_authenticated:
 		customer = request.user.customer
 		order, created = Order.objects.get_or_create(customer=customer, complete=False)
 		items = order.orderitem_set.all()
 		cartItems = order.get_cart_items
-	else:
-		#Create empty cart for now for non-logged in user
-		try:
-			cart = json.loads(request.COOKIES['cart'])
-		except:
-			cart = {}
-		# print('CART:', cart)
-
-		items = []
-		order = {'get_cart_total':0, 'get_cart_items':0}
-		cartItems = order['get_cart_items']
-
-		for i in cart:
-			try:
-				# print("testt"+i)
-				cartItems += cart[i]['quantity']
-				product = Product.objects.get(id=i)
-				total = (product.price * cart[i]['quantity'])
-				order['get_cart_total'] += total
-				order['get_cart_items'] += cart[i]['quantity']
-
-				item = {
-					'id':product.id,
-					'product':{
-						'id':product.id,
-						'name':product.name, 
-						'price':product.price, 
-					    'imageURL':product.imageURL
-						}, 
-					'quantity':cart[i]['quantity'],
-					'digital':product.digital,
-					'get_total':total,
-				}
-				items.append(item)
-
-			except:
-				pass
-
+	
 	context = {'items':items, 'order':order, 'cartItems':cartItems}
 	return render(request, 'store/cart.html', context)
 
+
+@login_required
 def checkout(request):
 	if request.user.is_authenticated:
 		customer = request.user.customer
 		order, created = Order.objects.get_or_create(customer=customer, complete=False)
 		items = order.orderitem_set.all()
-	else:
-		#Create empty cart for now for non-logged in user
-		items = []
-		order = {'get_cart_total':0, 'get_cart_items':0}
-
-	context = {'items':items, 'order':order}
+		cartItems = order.get_cart_items
+	
+	context = {'items':items, 'order':order, 'cartItems':cartItems}
 	return render(request, 'store/checkout.html', context)
 
 def updateItem(request):
@@ -126,3 +76,49 @@ def register(request):
 			form.save()
 			return HttpResponseRedirect('/')
 	return render(request, 'store/register.html', {'form':form})
+
+def processOrder(request):
+	transaction_id = datetime.datetime.now().timestamp()
+	data = json.loads(request.body)
+
+	if request.user.is_authenticated:
+		customer = request.user.customer
+		order, created = Order.objects.get_or_create(customer=customer, complete=False)
+	
+	total = float(data['form']['total'])
+	order.transaction_id = transaction_id
+
+	order.complete = True
+		
+	order.save()
+
+	if order.shipping == True:
+		ShippingAddress.objects.create(
+		customer=customer,
+		order=order,
+		address=data['shipping']['address'],
+		city=data['shipping']['city'],
+		state=data['shipping']['state'],
+		zipcode=data['shipping']['zipcode'],
+		)
+	return JsonResponse('Payment submitted..', safe=False)
+
+def login(request):
+	return render(request, 'store/login.html')
+
+def viewProduct(request):
+	data = json.loads(request.body)
+	productId = data['productId']
+	action = data['action']
+
+	print('Action:', action)
+	print('Product:', productId)
+
+	product = Product.objects.get(id=productId)
+	context = {'product':product}
+	# detail(request,context)
+	return JsonResponse('Item was added', safe=False)
+	# return render(request, 'store/detail.html',context)
+
+def detail(request):
+	return render(request,'store/detail.html')
